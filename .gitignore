@@ -1,0 +1,19 @@
+# Build directories
+build/
+cmake-build-*/
+
+# Binaries
+*.exe
+*.dll
+*.lib
+*.pdb
+*.obj
+
+# Generated files
+*.bmp
+*.txt
+!README.md
+!CMakeLists.txt
+
+# Release folder
+release/
