@@ -1,13 +1,10 @@
-name: Build and Release
+name: Auto Build and Release
 
 on:
   push:
-    branches: [ master, main ]
-    tags:
-      - 'v*'
-
-  pull_request:
-    branches: [ master, main ]
+    branches:
+      - main
+      - master
 
 permissions:
   contents: write
@@ -17,14 +14,27 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v4
+    # =========================================
+    # Checkout Repository
+    # =========================================
+    - name: Checkout
+      uses: actions/checkout@v4
 
+    # =========================================
+    # Configure CMake
+    # =========================================
     - name: Configure CMake
       run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
+    # =========================================
+    # Build Project
+    # =========================================
     - name: Build
       run: cmake --build build --config Release
 
+    # =========================================
+    # Create Release Folder
+    # =========================================
     - name: Prepare Release Package
       shell: pwsh
       run: |
@@ -36,20 +46,56 @@ jobs:
         Copy-Item "build/Release/BMP.dll" "release/bin/"
         Copy-Item "build/Release/BMP.lib" "release/bin/"
 
+        $commit = "${{ github.sha }}".Substring(0,7)
+
         Compress-Archive `
           -Path "release/*" `
-          -DestinationPath "BMP_Library_${{ github.ref_name }}.zip"
+          -DestinationPath "BMP_Library_$commit.zip"
 
+    # =========================================
+    # Upload Build Artifact
+    # =========================================
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: BMP-Library-Package
-        path: release/
+        name: BMP-Library
+        path: "*.zip"
 
-    - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/')
+    # =========================================
+    # Delete Old Latest Release
+    # =========================================
+    - name: Delete Old Latest Release
+      uses: dev-drprasad/delete-tag-and-release@v1.1
+      with:
+        delete_release: true
+        tag_name: latest
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      continue-on-error: true
+
+    # =========================================
+    # Create Latest Tag
+    # =========================================
+    - name: Create Latest Tag
+      run: |
+        git tag latest
+        git push origin latest --force
+
+    # =========================================
+    # Publish GitHub Release
+    # =========================================
+    - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       with:
-        files: BMP_Library_${{ github.ref_name }}.zip
+        tag_name: latest
+        name: Latest Build
+        body: |
+          Automatic build generated from latest commit.
+
+          Commit:
+          ${{ github.sha }}
+
+        files: "*.zip"
+
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
